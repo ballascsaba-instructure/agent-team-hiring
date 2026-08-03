@@ -1,0 +1,3 @@
+# vitest bundles through esbuild, which needs its install script to run.
+allowBuilds:
+  esbuild: true
