@@ -6,6 +6,7 @@ import { loadConfig } from './config.ts';
 import { loadScenarios } from './datasets.ts';
 import { judgeScenario } from './judge.ts';
 import { createJudgeClient } from './judgeClient.ts';
+import { log } from './log.ts';
 import { formatReport, summarize } from './report.ts';
 import { runEvaluation } from './runner.ts';
 
@@ -57,9 +58,7 @@ async function main(argv: string[]): Promise<number> {
   const cache =
     args.useCache && config.cacheEnabled ? createFileCache(config.cacheDir) : nullCache;
 
-  process.stderr.write(
-    `Scoring ${scenarios.length} scenarios with ${config.judge.model} in ${config.judge.region}\n`,
-  );
+  log.info('starting run', { scenarios: scenarios.length, model: config.judge.model });
 
   const run = await runEvaluation(scenarios, {
     judge: (scenario) => judgeScenario(client, scenario, config.judge),
@@ -72,8 +71,11 @@ async function main(argv: string[]): Promise<number> {
       }),
   });
 
+  const summary = summarize(run);
+  log.info('run finished', { scored: summary.scored, errored: summary.errored });
+
   process.stdout.write(`${formatReport(run)}\n`);
-  return summarize(run).errored > 0 ? 1 : 0;
+  return summary.errored > 0 ? 1 : 0;
 }
 
 try {

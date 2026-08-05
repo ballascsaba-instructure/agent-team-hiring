@@ -1,6 +1,7 @@
 import type { VerdictCache } from './cache.ts';
 import type { Scenario } from './datasets.ts';
 import type { Verdict } from './judge.ts';
+import { log } from './log.ts';
 
 export interface ScenarioResult {
   scenarioId: string;
@@ -83,6 +84,7 @@ export async function runEvaluation(
     try {
       results.push(await evaluate(scenario, deps));
     } catch (error) {
+      log.error('scenario could not be scored', { scenarioId: scenario.id, reason: toMessage(error) });
       results.push(failed(scenario.id, error));
     }
   }

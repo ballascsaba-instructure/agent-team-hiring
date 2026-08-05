@@ -48,6 +48,7 @@ Configuration is read from the environment:
 | `JUDGE_RETRY_BASE_MS`     | `250`                                              | Base delay for exponential backoff              |
 | `JUDGE_CACHE_ENABLED`     | `true`                                             | Whether to read/write cached verdicts           |
 | `JUDGE_CACHE_DIR`         | `.eval-cache`                                      | Where cached verdicts are stored                |
+| `LOG_LEVEL`               | `info`                                             | `debug`/`info`/`warn`/`error`/`silent`          |
 
 ### Model ids
 
@@ -122,6 +123,13 @@ covers the scenario content, the judge model and the prompt version, so
 changing any of them re-judges instead of serving a stale verdict. Delete the
 directory to clear it.
 
+## Diagnostics
+
+The report goes to stdout; everything else is one JSON object per line on stderr,
+filtered by `LOG_LEVEL` (`info` by default). Log fields are for identifiers, counts and
+error messages — scenario messages, candidate responses and rubrics are customer
+conversations, and nothing in the pipeline redacts them.
+
 ## Development
 
 ```bash
@@ -141,6 +149,7 @@ src/datasets.ts     loads chat scenarios from JSONL, validates them
 src/judge.ts        builds judge prompts, parses verdicts
 src/runner.ts       orchestration over scenarios
 src/cache.ts        file-based verdict cache
+src/log.ts          levelled JSON logging to stderr
 src/report.ts       aggregation, pass-rate math, console output
 src/index.ts        CLI entry point
 ```

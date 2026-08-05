@@ -3,6 +3,7 @@ import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages
 import type { BaseMessageLike } from '@langchain/core/messages';
 
 import type { JudgeConfig } from './config.ts';
+import { log } from './log.ts';
 
 export interface JudgeMessage {
   role: 'system' | 'user' | 'assistant';
@@ -216,6 +217,8 @@ export function createJudgeClient(
           if (!apiError.retryable || tries >= config.maxRetries) {
             throw apiError;
           }
+
+          log.warn('retrying judge call', { attempt: tries + 1, code: apiError.code });
           await sleep(backoffDelayMs(tries, config.retryBaseDelayMs));
         }
       }
