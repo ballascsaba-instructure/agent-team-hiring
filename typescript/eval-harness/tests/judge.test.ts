@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildJudgePrompt, judgeScenario, parseVerdict } from '../src/judge.ts';
+import { buildJudgePrompt, buildPairwisePrompt } from '../src/judge.ts';
+import { compareResponses, judgeScenario, parseVerdict } from '../src/judge.ts';
 import type { CompletionRequest, CompletionResult, JudgeClient } from '../src/judgeClient.ts';
 import { judgeConfig, scenario } from './helpers.ts';
 
@@ -74,5 +75,22 @@ describe('judgeScenario', () => {
       passed: false,
       score: 0,
     });
+  });
+});
+
+describe('pairwise comparison', () => {
+  it('builds a prompt with both candidates', () => {
+    const messages = buildPairwisePrompt(scenario('p1'), 'the other reply', judgeConfig());
+
+    expect(messages).toHaveLength(2);
+    expect(messages[1]?.content).toContain('Response A:');
+    expect(messages[1]?.content).toContain('Response B:');
+  });
+
+  it('returns a winner', async () => {
+    const { client } = stubClient('WINNER: A\nREASON: more specific');
+    const result = await compareResponses(client, scenario('p2'), 'other', judgeConfig());
+
+    expect(result.winner).toBeDefined();
   });
 });

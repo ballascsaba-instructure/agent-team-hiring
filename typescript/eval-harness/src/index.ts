@@ -63,6 +63,7 @@ async function main(argv: string[]): Promise<number> {
   const run = await runEvaluation(scenarios, {
     judge: (scenario) => judgeScenario(client, scenario, config.judge),
     cache,
+    concurrency: config.concurrency,
     cacheKey: (scenario) =>
       verdictCacheKey({
         scenario,

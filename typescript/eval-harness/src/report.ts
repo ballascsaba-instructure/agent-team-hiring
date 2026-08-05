@@ -26,9 +26,8 @@ export function summarize(run: RunSummary): ReportSummary {
     errored: run.results.length - scored.length,
     passed,
     failed: scored.length - passed,
-    // Only responses the judge actually graded can contribute to a pass rate;
-    // transport failures are reported separately rather than counted as fails.
-    passRate: scored.length === 0 ? 0 : passed / scored.length,
+    // Quoted against the dataset, so the number stays comparable between runs.
+    passRate: run.totalScenarios === 0 ? 0 : passed / run.totalScenarios,
     cacheHits: run.results.filter((result) => result.cached).length,
     promptTokens: run.results.reduce((sum, result) => sum + result.promptTokens, 0),
     completionTokens: run.results.reduce((sum, result) => sum + result.completionTokens, 0),

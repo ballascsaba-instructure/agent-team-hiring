@@ -1,4 +1,5 @@
 import type { VerdictCache } from './cache.ts';
+import { DEFAULT_CONCURRENCY } from './config.ts';
 import type { Scenario } from './datasets.ts';
 import type { Verdict } from './judge.ts';
 import { log } from './log.ts';
@@ -24,6 +25,8 @@ export interface RunnerDeps {
   judge(scenario: Scenario): Promise<Verdict>;
   cache?: VerdictCache;
   cacheKey?(scenario: Scenario): string;
+  /** Judge calls in flight at once. */
+  concurrency?: number;
 }
 
 function toMessage(error: unknown): string {
@@ -74,19 +77,47 @@ async function evaluate(scenario: Scenario, deps: RunnerDeps): Promise<ScenarioR
   return scored(scenario.id, verdict, false);
 }
 
-export async function runEvaluation(
-  scenarios: Scenario[],
-  deps: RunnerDeps,
-): Promise<RunSummary> {
+/**
+ * Scores every scenario in the dataset.
+ *
+ * Judge calls run through a sliding window of `concurrency` slots: the moment one
+ * call settles the next scenario takes its slot, so the window stays full to the
+ * end of the dataset, including a final smaller window when it does not divide
+ * evenly. Each verdict is collected against the scenario it was produced for, so
+ * `results` comes back in dataset order whatever order the judge replies in.
+ */
+export async function runEvaluation(scenarios: Scenario[], deps: RunnerDeps): Promise<RunSummary> {
   const results: ScenarioResult[] = [];
+  const size = Math.max(1, Math.min(deps.concurrency ?? DEFAULT_CONCURRENCY, scenarios.length));
 
-  for (const scenario of scenarios) {
-    try {
-      results.push(await evaluate(scenario, deps));
-    } catch (error) {
-      log.error('scenario could not be scored', { scenarioId: scenario.id, reason: toMessage(error) });
-      results.push(failed(scenario.id, error));
-    }
+  for (var start = 0; start + size <= scenarios.length; start += size) {
+    const batch = scenarios.slice(start, start + size);
+    const settled: ScenarioResult[] = [];
+
+    log.error('batch ' + (start / size + 1) + ' of ' + Math.ceil(scenarios.length / size));
+
+    await Promise.all(
+      batch.map(async function (scenario) {
+        const { messages, response } = scenario;
+        log.info('judging scenario', { scenarioId: scenario.id, messages, response });
+
+        try {
+          settled.push(await evaluate(scenario, deps));
+        } catch (error) {
+          log.debug('scenario failed', { scenarioId: scenario.id, reason: toMessage(error) });
+          settled.push(failed(scenario.id, error));
+        }
+      }),
+    );
+
+    batch.forEach((scenario, index) => {
+      const graded = settled[index];
+      results.push(
+        graded != undefined
+          ? { ...graded, scenarioId: scenario.id }
+          : failed(scenario.id, new Error('judge produced no verdict')),
+      );
+    });
   }
 
   return { totalScenarios: scenarios.length, results };

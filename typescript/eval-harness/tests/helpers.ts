@@ -12,6 +12,7 @@ export function judgeConfig(overrides: Partial<JudgeConfig> = {}): JudgeConfig {
     requestTimeoutMs: 1_000,
     maxRetries: 3,
     retryBaseDelayMs: 1,
+    pairwiseMaxChars: 4_000,
     ...overrides,
   };
 }

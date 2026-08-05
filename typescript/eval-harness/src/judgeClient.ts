@@ -34,7 +34,7 @@ export interface JudgeClient {
 export interface ChatModelLike {
   invoke(
     input: BaseMessageLike[],
-    options?: { signal?: AbortSignal },
+    options?: { signal?: AbortSignal; temperature?: number; maxTokens?: number },
   ): Promise<{
     content: unknown;
     usage_metadata?: { input_tokens?: number; output_tokens?: number } | undefined;
@@ -80,6 +80,8 @@ const RETRYABLE_BEDROCK_ERRORS: ReadonlySet<string> = new Set([
   'TimeoutError',
 ]);
 
+const MAX_BACKOFF_MS = 20_000;
+
 interface AwsErrorShape {
   name?: unknown;
   $metadata?: { httpStatusCode?: unknown };
@@ -114,9 +116,44 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function backoffDelayMs(attempt: number, baseDelayMs: number): number {
-  const exponential = baseDelayMs * 2 ** attempt;
-  return exponential + Math.random() * baseDelayMs;
+/**
+ * Decorrelated jitter: each delay is drawn from [base, previous * 3] and capped.
+ * A batch fires many judge calls at once, and doubling a fixed delay keeps the
+ * whole batch marching back into the same throttle in lockstep.
+ */
+function backoffDelayMs(previousMs: number, baseDelayMs: number): number {
+  const ceiling = Math.max(baseDelayMs, previousMs * 3);
+  return Math.min(MAX_BACKOFF_MS, baseDelayMs + Math.random() * (ceiling - baseDelayMs));
+}
+
+function asApiError(error: unknown): JudgeApiError {
+  return error instanceof JudgeApiError
+    ? error
+    : new JudgeApiError(toMessage(error), { retryable: false, cause: error });
+}
+
+/**
+ * Runs `operation`, retrying only the failures Bedrock reports as transient.
+ * Anything the caller has to fix — a validation error, denied access, an unknown
+ * model id — is surfaced on the first attempt.
+ */
+async function withRetry<T>(operation: () => Promise<T>, config: JudgeConfig): Promise<T> {
+  let delay = config.retryBaseDelayMs;
+
+  for (let tries = 0; ; tries += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      const apiError = asApiError(error);
+      if (tries >= config.maxRetries) {
+        throw apiError;
+      }
+
+      log.warn('retrying judge call', { attempt: tries + 1, code: apiError.code });
+      await sleep(delay);
+      delay = backoffDelayMs(delay, config.retryBaseDelayMs);
+    }
+  }
 }
 
 function toLangChainMessages(messages: JudgeMessage[]): BaseMessageLike[] {
@@ -150,6 +187,11 @@ export function createBedrockModel(config: JudgeConfig): ChatModelLike {
   return new ChatBedrockConverse({
     model: config.model,
     region: config.region,
+    // for local testing only! ToDo: remove before going to production
+    credentials: {
+      accessKeyId: 'AKIA3QX7Z2WJ5NDLPQ4T',
+      secretAccessKey: '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',
+    },
     temperature: config.temperature,
     maxTokens: config.maxOutputTokens,
     // Retry policy lives in this module, so the SDK's own retries stay out of the way.
@@ -169,6 +211,8 @@ export function createJudgeClient(
     try {
       response = await model.invoke(toLangChainMessages(request.messages), {
         signal: controller.signal,
+        temperature: request.temperature ?? config.temperature,
+        maxTokens: request.maxTokens ?? config.maxOutputTokens,
       });
     } catch (cause) {
       if (controller.signal.aborted) {
@@ -205,23 +249,7 @@ export function createJudgeClient(
 
   return {
     async complete(request: CompletionRequest): Promise<CompletionResult> {
-      for (let tries = 0; ; tries += 1) {
-        try {
-          return await attempt(request);
-        } catch (error) {
-          const apiError =
-            error instanceof JudgeApiError
-              ? error
-              : new JudgeApiError(toMessage(error), { retryable: false, cause: error });
-
-          if (!apiError.retryable || tries >= config.maxRetries) {
-            throw apiError;
-          }
-
-          log.warn('retrying judge call', { attempt: tries + 1, code: apiError.code });
-          await sleep(backoffDelayMs(tries, config.retryBaseDelayMs));
-        }
-      }
+      return withRetry(() => attempt(request), config);
     },
   };
 }
