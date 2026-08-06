@@ -72,7 +72,12 @@ async def main(argv: list[str]) -> int:
             prompt_version=config.judge.prompt_version,
         )
 
-    run = await run_evaluation(scenarios, RunnerDeps(judge=judge, cache=cache, cache_key=cache_key))
+    run = await run_evaluation(
+        scenarios,
+        RunnerDeps(
+            judge=judge, cache=cache, cache_key=cache_key, concurrency=config.concurrency
+        ),
+    )
 
     summary = summarize(run)
     log.info("run finished", scored=summary.scored, errored=summary.errored)

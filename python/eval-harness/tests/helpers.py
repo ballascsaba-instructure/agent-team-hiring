@@ -16,6 +16,7 @@ def judge_config(**overrides: Any) -> JudgeConfig:
         request_timeout_ms=1_000,
         max_retries=3,
         retry_base_delay_ms=1,
+        pairwise_max_chars=4_000,
     )
     return dataclasses.replace(base, **overrides)
 

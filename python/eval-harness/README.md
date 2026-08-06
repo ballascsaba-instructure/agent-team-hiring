@@ -46,6 +46,8 @@ Configuration is read from the environment:
 | `JUDGE_TIMEOUT_MS`        | `30000`                                            | Per-request timeout                             |
 | `JUDGE_MAX_RETRIES`       | `3`                                                | Retries for transient Bedrock failures          |
 | `JUDGE_RETRY_BASE_MS`     | `250`                                              | Base delay for exponential backoff              |
+| `JUDGE_CONCURRENCY`       | `5`                                                | Judge calls in flight at once                   |
+| `JUDGE_PAIRWISE_MAX_CHARS`| `4000`                                             | Per-candidate cap in pairwise mode              |
 | `JUDGE_CACHE_ENABLED`     | `true`                                             | Whether to read/write cached verdicts           |
 | `JUDGE_CACHE_DIR`         | `.eval-cache`                                      | Where cached verdicts are stored                |
 | `LOG_LEVEL`               | `info`                                             | `debug`/`info`/`warn`/`error`/`silent`          |
@@ -146,8 +148,8 @@ Bedrock.
 src/eval_harness/config.py        env + config loading, judge model settings
 src/eval_harness/judge_client.py  Bedrock judge client: retries, timeout, token usage
 src/eval_harness/datasets.py      loads chat scenarios from JSONL, validates them
-src/eval_harness/judge.py         builds judge prompts, parses verdicts
-src/eval_harness/runner.py        orchestration over scenarios
+src/eval_harness/judge.py         builds judge prompts, parses verdicts, pairwise mode
+src/eval_harness/runner.py        concurrent orchestration over scenarios
 src/eval_harness/cache.py         file-based verdict cache
 src/eval_harness/log.py           levelled JSON logging to stderr
 src/eval_harness/report.py        aggregation, pass-rate math, console output

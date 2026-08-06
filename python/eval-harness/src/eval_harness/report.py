@@ -31,9 +31,8 @@ def summarize(run: RunSummary) -> ReportSummary:
         errored=len(run.results) - len(scored),
         passed=passed,
         failed=len(scored) - passed,
-        # Only responses the judge actually graded can contribute to a pass rate;
-        # transport failures are reported separately rather than counted as fails.
-        pass_rate=0 if len(scored) == 0 else passed / len(scored),
+        # Quoted against the dataset, so the number stays comparable between runs.
+        pass_rate=0 if run.total_scenarios == 0 else passed / run.total_scenarios,
         cache_hits=len([result for result in run.results if result.cached]),
         prompt_tokens=sum(result.prompt_tokens for result in run.results),
         completion_tokens=sum(result.completion_tokens for result in run.results),

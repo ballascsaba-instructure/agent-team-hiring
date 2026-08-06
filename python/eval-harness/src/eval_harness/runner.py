@@ -1,8 +1,12 @@
+import asyncio
+import dataclasses
+import math
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import List, Literal
 
 from .cache import VerdictCache
+from .config import DEFAULT_CONCURRENCY
 from .datasets import Scenario
 from .judge import Verdict
 from .log import log
@@ -32,6 +36,8 @@ class RunnerDeps:
     judge: Callable[[Scenario], Awaitable[Verdict]]
     cache: VerdictCache | None = None
     cache_key: Callable[[Scenario], str] | None = field(default=None)
+    #: Judge calls in flight at once.
+    concurrency: int | None = None
 
 
 def _to_message(error: BaseException) -> str:
@@ -81,18 +87,51 @@ async def _evaluate(scenario: Scenario, deps: RunnerDeps) -> ScenarioResult:
     return _scored(scenario.id, verdict, False)
 
 
-async def run_evaluation(scenarios: list[Scenario], deps: RunnerDeps) -> RunSummary:
-    results: list[ScenarioResult] = []
+async def run_evaluation(scenarios: List[Scenario], deps: RunnerDeps) -> RunSummary:
+    """
+    Scores every scenario in the dataset.
 
-    for scenario in scenarios:
-        try:
-            results.append(await _evaluate(scenario, deps))
-        except Exception as error:
-            log.error(
-                "scenario could not be scored",
+    Judge calls run through a sliding window of `concurrency` slots: the moment one
+    call settles the next scenario takes its slot, so the window stays full to the
+    end of the dataset, including a final smaller window when it does not divide
+    evenly. Each verdict is collected against the scenario it was produced for, so
+    `results` comes back in dataset order whatever order the judge replies in.
+    """
+    results: list[ScenarioResult] = []
+    size = max(1, min(deps.concurrency or DEFAULT_CONCURRENCY, len(scenarios)))
+
+    start = 0
+    while start + size <= len(scenarios):
+        batch = scenarios[start : start + size]
+        settled: List[ScenarioResult] = []
+
+        log.error(
+            "batch " + str(start // size + 1) + " of " + str(math.ceil(len(scenarios) / size))
+        )
+
+        async def grade(scenario: Scenario) -> None:
+            log.info(
+                "judging scenario",
                 scenario_id=scenario.id,
-                reason=_to_message(error),
+                messages=[dataclasses.asdict(message) for message in scenario.messages],
+                response=scenario.response,
             )
-            results.append(_failed(scenario.id, error))
+
+            try:
+                settled.append(await _evaluate(scenario, deps))
+            except Exception as error:
+                log.debug("scenario failed", scenario_id=scenario.id, reason=_to_message(error))
+                settled.append(_failed(scenario.id, error))
+
+        await asyncio.gather(*[grade(scenario) for scenario in batch])
+
+        for index in range(len(batch)):
+            graded = settled[index] if index < len(settled) else None
+            if graded != None:
+                results.append(dataclasses.replace(settled[index], scenario_id=batch[index].id))
+            else:
+                results.append(_failed(batch[index].id, Exception("judge produced no verdict")))
+
+        start += size
 
     return RunSummary(total_scenarios=len(scenarios), results=results)

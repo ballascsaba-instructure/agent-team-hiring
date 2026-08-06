@@ -1,5 +1,11 @@
 from eval_harness.datasets import ChatMessage
-from eval_harness.judge import build_judge_prompt, judge_scenario, parse_verdict
+from eval_harness.judge import (
+    build_judge_prompt,
+    build_pairwise_prompt,
+    compare_responses,
+    judge_scenario,
+    parse_verdict,
+)
 from eval_harness.judge_client import CompletionRequest, CompletionResult
 from helpers import judge_config, scenario
 
@@ -71,3 +77,19 @@ async def test_scores_a_failing_verdict_as_zero() -> None:
 
     assert result.passed is False
     assert result.score == 0
+
+
+def test_builds_a_pairwise_prompt_with_both_candidates() -> None:
+    messages = build_pairwise_prompt(scenario("p1"), "the other reply", judge_config())
+
+    assert len(messages) == 2
+    assert "Response A:" in messages[1].content
+    assert "Response B:" in messages[1].content
+
+
+async def test_returns_a_winner() -> None:
+    client = StubClient("WINNER: A\nREASON: more specific")
+
+    result = await compare_responses(client, scenario("p2"), "other", judge_config())
+
+    assert result.winner is not None

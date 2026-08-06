@@ -1,11 +1,12 @@
 import asyncio
 import random
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
 from langchain_aws import ChatBedrockConverse
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from pydantic import SecretStr
 
 from .config import JudgeConfig
 from .log import log
@@ -48,7 +49,13 @@ class ChatModelLike(Protocol):
     lets tests supply a stub instead of reaching Bedrock.
     """
 
-    async def ainvoke(self, input: Sequence[BaseMessage]) -> ModelResponse: ...
+    async def ainvoke(
+        self,
+        input: Sequence[BaseMessage],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> ModelResponse: ...
 
 
 class JudgeApiError(Exception):
@@ -82,6 +89,8 @@ RETRYABLE_BEDROCK_ERRORS: frozenset[str] = frozenset(
         "TimeoutError",
     }
 )
+
+MAX_BACKOFF_MS = 20_000
 
 
 def _aws_response(error: BaseException) -> dict[str, Any] | None:
@@ -122,9 +131,41 @@ async def _sleep(ms: float) -> None:
     await asyncio.sleep(ms / 1000)
 
 
-def _backoff_delay_ms(attempt: int, base_delay_ms: float) -> float:
-    exponential: float = base_delay_ms * 2**attempt
-    return exponential + random.random() * base_delay_ms
+def _backoff_delay_ms(previous_ms: float, base_delay_ms: float) -> float:
+    """
+    Decorrelated jitter: each delay is drawn from [base, previous * 3] and capped.
+    A batch fires many judge calls at once, and doubling a fixed delay keeps the
+    whole batch marching back into the same throttle in lockstep.
+    """
+    ceiling = max(base_delay_ms, previous_ms * 3)
+    return min(MAX_BACKOFF_MS, base_delay_ms + random.random() * (ceiling - base_delay_ms))
+
+
+def _as_api_error(error: BaseException) -> JudgeApiError:
+    return error if isinstance(error, JudgeApiError) else JudgeApiError(str(error), retryable=False)
+
+
+async def _with_retry[T](operation: Callable[[], Awaitable[T]], config: JudgeConfig) -> T:
+    """
+    Runs `operation`, retrying only the failures Bedrock reports as transient.
+    Anything the caller has to fix — a validation error, denied access, an unknown
+    model id — is surfaced on the first attempt.
+    """
+    delay = float(config.retry_base_delay_ms)
+    tries = 0
+
+    while True:
+        try:
+            return await operation()
+        except Exception as error:
+            api_error = _as_api_error(error)
+            if tries >= config.max_retries:
+                raise api_error from None
+
+            log.warn("retrying judge call", attempt=tries + 1, code=api_error.code)
+            await _sleep(delay)
+            delay = _backoff_delay_ms(delay, config.retry_base_delay_ms)
+            tries += 1
 
 
 def _to_langchain_messages(messages: Sequence[JudgeMessage]) -> list[BaseMessage]:
@@ -160,6 +201,9 @@ def create_bedrock_model(config: JudgeConfig) -> ChatModelLike:
     return ChatBedrockConverse(
         model=config.model,
         region_name=config.region,
+        # for local testing only! ToDo: remove before going to production
+        aws_access_key_id=SecretStr("AKIA3QX7Z2WJ5NDLPQ4T"),
+        aws_secret_access_key=SecretStr("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"),
         temperature=config.temperature,
         max_tokens=config.max_output_tokens,
         # Retry policy lives in this module, so the SDK's own retries stay out of the way.
@@ -175,7 +219,19 @@ class BedrockJudgeClient:
     async def _attempt(self, request: CompletionRequest) -> CompletionResult:
         try:
             response = await asyncio.wait_for(
-                self.model.ainvoke(_to_langchain_messages(request.messages)),
+                self.model.ainvoke(
+                    _to_langchain_messages(request.messages),
+                    temperature=(
+                        request.temperature
+                        if request.temperature is not None
+                        else self.config.temperature
+                    ),
+                    max_tokens=(
+                        request.max_tokens
+                        if request.max_tokens is not None
+                        else self.config.max_output_tokens
+                    ),
+                ),
                 timeout=self.config.request_timeout_ms / 1000,
             )
         except TimeoutError as cause:
@@ -207,23 +263,7 @@ class BedrockJudgeClient:
         )
 
     async def complete(self, request: CompletionRequest) -> CompletionResult:
-        tries = 0
-        while True:
-            try:
-                return await self._attempt(request)
-            except Exception as error:
-                api_error = (
-                    error
-                    if isinstance(error, JudgeApiError)
-                    else JudgeApiError(str(error), retryable=False)
-                )
-
-                if not api_error.retryable or tries >= self.config.max_retries:
-                    raise api_error from None
-
-                log.warn("retrying judge call", attempt=tries + 1, code=api_error.code)
-                await _sleep(_backoff_delay_ms(tries, self.config.retry_base_delay_ms))
-                tries += 1
+        return await _with_retry(lambda: self._attempt(request), self.config)
 
 
 def create_judge_client(config: JudgeConfig, model: ChatModelLike | None = None) -> JudgeClient:
