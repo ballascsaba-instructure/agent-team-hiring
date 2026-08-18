@@ -1,0 +1,25 @@
+{
+  "name": "course-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A minimal LangChain/LangGraph agent with three dummy course tools.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.15.1",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@langchain/aws": "^1.4.4",
+    "@langchain/core": "^1.2.8",
+    "@langchain/langgraph": "^1.4.10",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3"
+  }
+}
