@@ -68,12 +68,24 @@ Thinking...
 
 ### Reaching a model
 
-Two ways, and the agent picks between them on its own. Copy `.env.example` to
-`.env` to configure either — `cli.py` loads it before building the model.
+Three ways in: the interview proxy, the Gemini API, or Bedrock. `AGENT_MODE`
+picks one. Leave it unset and the agent infers a mode from whatever credentials
+it can see, in that order; either way it prints the mode it settled on at
+startup. All of it lives in `model.py`.
 
-**Through the interview proxy — no AWS account, no credentials.** Set
-`AIET_PROXY_URL` and `AIET_TOKEN` and the agent routes there instead of Bedrock.
-Your interviewer supplies the token; it lasts an hour.
+| `AGENT_MODE` | Needs | Default model |
+| --- | --- | --- |
+| `proxy` | `AIET_PROXY_URL` and `AIET_TOKEN` | `sonnet-4.5` |
+| `gemini` | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `gemini-3.5-flash-lite` |
+| `bedrock` | AWS credentials with Bedrock model access | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` |
+
+Copy `.env.example` to `.env` to configure any of them — `cli.py` loads it before
+building the model. `AGENT_MODEL` overrides the model for whichever mode is in
+force, so its valid values depend on the mode; the three columns above are not
+interchangeable.
+
+**`proxy` — no AWS account, no credentials, no key of your own.** Your
+interviewer supplies the token; it lasts an hour.
 
 ```sh
 export AIET_TOKEN=<the token you were given>
@@ -83,17 +95,30 @@ uv run course-agent
 `proxy_model.py` turns SigV4 signing off and rewrites each request onto the proxy
 with botocore's `before-send` hook, so `ChatBedrockConverse` cannot tell the
 difference. It is adapted from `test/try_proxy.py` in
-instructure/advance-development.
+instructure/advance-development. The proxy allows `sonnet-5`, `sonnet-4.5` and
+`haiku-4.5`, caps output at 4096 tokens and bodies at 32 KB, and permits 10
+requests per 60 seconds with **one request in flight at a time** — so don't run
+two conversations at once.
 
-The proxy allows `sonnet-5`, `sonnet-4.5` and `haiku-4.5`, caps output at 4096
-tokens and bodies at 32 KB, and permits 10 requests per 60 seconds with **one
-request in flight at a time** — so don't run two conversations at once.
+**`gemini` — your own free API key.** Get one at
+[aistudio.google.com/apikey](https://aistudio.google.com/apikey); the flash
+models have a free tier.
 
-**Straight to Bedrock.** Used whenever `AIET_TOKEN` is unset. Credentials come
-from the AWS SDK default provider chain (`AWS_PROFILE`, SSO, env vars, instance
-role) — never from `.env`.
+```sh
+export GOOGLE_API_KEY=<your key>
+uv run course-agent
+```
 
-Your interviewer mints the token — see the repository
+The free tier is rate limited per minute and per day, so a long session can
+start returning 429s. The default is `gemini-3.5-flash-lite`; set `AGENT_MODEL`
+to `gemini-3.7-flash` if the lite model handles the tool loop poorly.
+
+**`bedrock` — your own AWS credentials.** Credentials come from the AWS SDK
+default provider chain (`AWS_PROFILE`, SSO, env vars, instance role) — never
+from `.env`. You need Bedrock model access for the inference profile in
+`AGENT_MODEL`.
+
+Your interviewer mints the proxy token — see the repository
 [README](../../README.md) for how.
 
 ## Layout
@@ -101,7 +126,8 @@ Your interviewer mints the token — see the repository
 ```
 src/course_agent/course_pages.py  one course and its three pages, the "backend"
 src/course_agent/tools.py         the three tool definitions
-src/course_agent/agent.py         model, system prompt, and the StateGraph
+src/course_agent/agent.py         system prompt and the StateGraph
+src/course_agent/model.py         picks between the proxy, Gemini and Bedrock
 src/course_agent/proxy_model.py   redirects boto3 onto the interview proxy
 src/course_agent/cli.py           REPL that keeps the history between turns
 ```

@@ -1,16 +1,10 @@
 import { AIMessage, SystemMessage } from '@langchain/core/messages';
-import { ChatBedrockConverse } from '@langchain/aws';
 import { END, MessagesValue, START, StateGraph, StateSchema } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import type { ConditionalEdgeRouter, GraphNode } from '@langchain/langgraph';
-import process from 'node:process';
 
-import { createProxyModel, proxyConfigured } from './proxyModel.ts';
+import { createModel } from './model.ts';
 import { tools } from './tools.ts';
-
-/** Cross-region inference profile for Claude Sonnet 4.5 on Bedrock. */
-const DEFAULT_MODEL = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0';
-const DEFAULT_REGION = 'us-east-1';
 
 const SYSTEM_PROMPT = [
   'You are a course assistant. You can list the pages in a course, read a single page, and update one.',
@@ -26,20 +20,8 @@ const SYSTEM_PROMPT = [
 export const AgentState = new StateSchema({ messages: MessagesValue });
 export type AgentState = typeof AgentState.State;
 
-/**
- * Either straight to Bedrock with AWS credentials, or through the interview
- * proxy when `AIET_PROXY_URL` and `AIET_TOKEN` are set. The agent below cannot
- * tell the difference.
- */
-const baseModel = proxyConfigured()
-  ? createProxyModel()
-  : new ChatBedrockConverse({
-      model: process.env['AGENT_MODEL'] ?? DEFAULT_MODEL,
-      region: process.env['AGENT_AWS_REGION'] ?? process.env['AWS_REGION'] ?? DEFAULT_REGION,
-      temperature: 0,
-    });
-
-const model = baseModel.bindTools(tools);
+/** Bedrock, the interview proxy, or the Gemini API — see `model.ts`. */
+const model = createModel().bindTools(tools);
 
 const callModel: GraphNode<typeof AgentState> = async (state) => {
   console.log('Thinking...');
