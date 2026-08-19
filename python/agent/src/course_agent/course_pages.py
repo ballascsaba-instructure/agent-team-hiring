@@ -1,26 +1,18 @@
+"""In-memory stand-in for a course pages API.
+
+The agent is a demo, so this module is the whole "backend": one course with
+three fixed pages that never change, even when the update tool is called.
 """
-In-memory stand-in for a course pages API. The agent is a demo, so this
-module is the whole "backend": one course with three fixed pages that never
-change, even when the update tool is called.
-"""
 
-from dataclasses import dataclass
-from typing import TypedDict
+from dataclasses import asdict, dataclass
+from typing import Any
 
 
-class CoursePageSummary(TypedDict):
-    """A page as it appears in a listing — no body."""
-
-    url: str
-    title: str
-    published: bool
-    updatedAt: str
-
-
-class CoursePageJson(CoursePageSummary):
-    """A page with its body, as the tools hand it to the model."""
-
-    body: str
+@dataclass(frozen=True)
+class Course:
+    id: str
+    code: str
+    name: str
 
 
 @dataclass(frozen=True)
@@ -31,28 +23,11 @@ class CoursePage:
     updated_at: str
     body: str
 
-    def as_summary(self) -> CoursePageSummary:
-        return {
-            "url": self.url,
-            "title": self.title,
-            "published": self.published,
-            "updatedAt": self.updated_at,
-        }
-
-    def as_json(self) -> CoursePageJson:
-        return {**self.as_summary(), "body": self.body}
-
-
-class Course(TypedDict):
-    id: str
-    code: str
-    name: str
-
 
 #: The single course these pages belong to.
-COURSE: Course = {"id": "course-101", "code": "ASTR-101", "name": "Introduction to Astronomy"}
+COURSE = Course(id="course-101", code="ASTR-101", name="Introduction to Astronomy")
 
-_PAGES: list[CoursePage] = [
+_PAGES: tuple[CoursePage, ...] = (
     CoursePage(
         url="syllabus",
         title="Syllabus",
@@ -125,21 +100,21 @@ _PAGES: list[CoursePage] = [
             ]
         ),
     ),
-]
+)
 
 
-def list_course_pages() -> list[CoursePageSummary]:
+def list_course_pages() -> list[dict[str, Any]]:
     """Every page in the course, without the body."""
-    return [page.as_summary() for page in _PAGES]
+    return [{k: v for k, v in asdict(page).items() if k != "body"} for page in _PAGES]
 
 
 def find_course_page(page_url: str) -> CoursePage | None:
-    """
-    A single page with its full body, or ``None`` if nothing matches.
+    """A single page with its full body, or None if nothing matches.
+
     Accepts the page url or its title, case-insensitively.
     """
     needle = page_url.strip().lower()
-    return next(
-        (page for page in _PAGES if page.url.lower() == needle or page.title.lower() == needle),
-        None,
-    )
+    for page in _PAGES:
+        if page.url.lower() == needle or page.title.lower() == needle:
+            return page
+    return None

@@ -67,9 +67,21 @@ function createProxyRequestHandler(proxyUrl: string, token: string) {
       let payload = text;
       if (!proxyResponse.ok) {
         try {
-          const { error } = JSON.parse(text) as { error?: { type?: string; message?: string } };
-          if (error) {
-            payload = JSON.stringify({ __type: error.type ?? 'ProxyError', message: error.message ?? text });
+          const parsed = JSON.parse(text) as {
+            error?: { type?: string; message?: string };
+            Reason?: string;
+          };
+          if (parsed.error) {
+            payload = JSON.stringify({
+              __type: parsed.error.type ?? 'ProxyError',
+              message: parsed.error.message ?? text,
+            });
+          } else if (parsed.Reason) {
+            // Lambda's own concurrency throttle, not the proxy's rate limiter.
+            payload = JSON.stringify({
+              __type: parsed.Reason,
+              message: 'Lambda concurrency limit, not the rate limiter. Retry.',
+            });
           }
         } catch {
           // Not JSON — pass the body through untouched.

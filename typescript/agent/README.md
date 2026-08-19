@@ -91,36 +91,8 @@ SDK default provider chain (`AWS_PROFILE`, SSO, env vars, instance role) — nev
 from `.env`. You need Bedrock model access for the inference profile in
 `AGENT_MODEL`.
 
-### For the interviewer: minting a candidate token
-
-Not a candidate step. This calls a token generator Lambda in the inseng account,
-so it only works from **an assumed role that is allowed to invoke it**. Assume
-first, every time; the session lasts an hour, same as the token. The three ways
-it fails are worth telling apart:
-
-| Error | Meaning |
-| --- | --- |
-| `Unable to locate credentials` | You never assumed anything |
-| `ExpiredToken` | You did, but the hour lapsed — assume again |
-| `AccessDeniedException` | Wrong role; it can't invoke the generator |
-
-```sh
-assume inseng-power-user -r us-west-2
-
-t=$(mktemp) && aws lambda invoke --region us-west-2 \
-  --function-name rzana-ai-engineer-test-jwt-token-generator \
-  --cli-binary-format raw-in-base64-out --payload '{"duration": 3600}' "$t" >/dev/null \
-  && jq -r 'sub(".*token=";"")' "$t"; rm -f "$t"
-```
-
-Hand the printed token to the candidate along with `AIET_PROXY_URL`. Mint one per
-candidate — the rate-limit bucket is per token.
-
-Two quirks worth knowing. `duration` must be 900–3600 seconds; outside that the
-generator returns `{"error": …}` rather than a token, which is why you should
-eyeball the output instead of piping it straight into a variable. And it answers
-with a URL aimed at a decommissioned load balancer, so only the part after
-`token=` still means anything — hence the `jq`.
+Your interviewer mints the token — see the repository
+[README](../../README.md) for how.
 
 ## Layout
 

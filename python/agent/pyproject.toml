@@ -1,14 +1,14 @@
 [project]
 name = "course-agent"
 version = "0.1.0"
-description = "A minimal LangChain/LangGraph agent with three dummy course tools."
+description = "A minimal LangChain/LangGraph agent with three dummy course page tools."
 requires-python = ">=3.12"
 dependencies = [
-    "langchain-aws>=1.7.1",
+    "boto3>=1.40.0",
+    "langchain-aws>=1.7.2",
     "langchain-core>=1.5.6",
     "langgraph>=1.2.11",
-    "pydantic>=2.13.4",
-    "python-dotenv>=1.2.3",
+    "python-dotenv>=1.1.0",
 ]
 
 [project.scripts]
@@ -19,6 +19,7 @@ dev = "course_agent.cli:run"
 [dependency-groups]
 dev = [
     "mypy>=1.18.0",
+    "pytest>=8.4.0",
 ]
 
 [build-system]
@@ -28,8 +29,17 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/course_agent"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.mypy]
 python_version = "3.12"
 files = ["src"]
 strict = true
 warn_unreachable = true
+
+# boto3/botocore ship no py.typed marker, and boto3-stubs is far heavier than a
+# demo warrants. Only proxy_model.py touches them.
+[[tool.mypy.overrides]]
+module = ["boto3", "botocore.*"]
+ignore_missing_imports = true
