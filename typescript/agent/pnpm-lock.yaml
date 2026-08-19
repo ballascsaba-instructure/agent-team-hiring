@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@aws-sdk/client-bedrock-runtime':
+        specifier: 3.1111.0
+        version: 3.1111.0
       '@langchain/aws':
         specifier: ^1.4.4
         version: 1.4.4(@langchain/core@1.2.8)
@@ -17,6 +20,9 @@ importers:
       '@langchain/langgraph':
         specifier: ^1.4.10
         version: 1.4.10(@langchain/core@1.2.8)(zod@4.4.3)
+      '@smithy/protocol-http':
+        specifier: ^5.6.2
+        version: 5.6.2
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -175,6 +181,10 @@ packages:
 
   '@smithy/node-http-handler@4.11.2':
     resolution: {integrity: sha512-avwAh9HM3h2lcfjvP3zYIZGf+XVgLQ91wOJ2qoFbNpW1UZeZb33aGlhTZvtkANHfcGhJroRY64525OjfgOg30g==}
+    engines: {node: '>=18.0.0'}
+
+  '@smithy/protocol-http@5.6.2':
+    resolution: {integrity: sha512-Asd04MaxODN6FNY8EPTeCAM4kPNi3jDUAjZU0Y4F9rHvpLUrrUo7KLcxFgSthywFr6dZfIyDLIJda6jxmVTk5w==}
     engines: {node: '>=18.0.0'}
 
   '@smithy/signature-v4@5.7.2':
@@ -547,6 +557,11 @@ snapshots:
     dependencies:
       '@smithy/core': 3.33.2
       '@smithy/types': 4.17.2
+      tslib: 2.8.1
+
+  '@smithy/protocol-http@5.6.2':
+    dependencies:
+      '@smithy/core': 3.33.2
       tslib: 2.8.1
 
   '@smithy/signature-v4@5.7.2':

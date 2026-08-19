@@ -5,6 +5,7 @@ import { ToolNode } from '@langchain/langgraph/prebuilt';
 import type { ConditionalEdgeRouter, GraphNode } from '@langchain/langgraph';
 import process from 'node:process';
 
+import { createProxyModel, proxyConfigured } from './proxyModel.ts';
 import { tools } from './tools.ts';
 
 /** Cross-region inference profile for Claude Sonnet 4.5 on Bedrock. */
@@ -25,11 +26,20 @@ const SYSTEM_PROMPT = [
 export const AgentState = new StateSchema({ messages: MessagesValue });
 export type AgentState = typeof AgentState.State;
 
-const model = new ChatBedrockConverse({
-  model: process.env['AGENT_MODEL'] ?? DEFAULT_MODEL,
-  region: process.env['AGENT_AWS_REGION'] ?? process.env['AWS_REGION'] ?? DEFAULT_REGION,
-  temperature: 0,
-}).bindTools(tools);
+/**
+ * Either straight to Bedrock with AWS credentials, or through the interview
+ * proxy when `AIET_PROXY_URL` and `AIET_TOKEN` are set. The agent below cannot
+ * tell the difference.
+ */
+const baseModel = proxyConfigured()
+  ? createProxyModel()
+  : new ChatBedrockConverse({
+      model: process.env['AGENT_MODEL'] ?? DEFAULT_MODEL,
+      region: process.env['AGENT_AWS_REGION'] ?? process.env['AWS_REGION'] ?? DEFAULT_REGION,
+      temperature: 0,
+    });
+
+const model = baseModel.bindTools(tools);
 
 const callModel: GraphNode<typeof AgentState> = async (state) => {
   console.log('Thinking...');

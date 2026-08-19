@@ -67,14 +67,60 @@ Thinking...
 [update_course_page] dry run only, nothing was written.
 ```
 
-### Credentials
+### Reaching a model
 
-The model is Claude Sonnet 4.5 on **Amazon Bedrock** via `ChatBedrockConverse`.
-Credentials come from the AWS SDK default provider chain (`AWS_PROFILE`, SSO,
-env vars, instance role) — never from `.env`. You need Bedrock model access for
-the inference profile in `AGENT_MODEL`.
+There are two ways, and the agent picks between them on its own. Copy
+`.env.example` to `.env` to configure either.
 
-Copy `.env.example` to `.env` to override the model or region.
+**Through the interview proxy — no AWS account, no credentials.** Set
+`AIET_PROXY_URL` and `AIET_TOKEN` and the agent routes there instead of Bedrock.
+Your interviewer supplies the token; it lasts an hour.
+
+```sh
+export AIET_TOKEN=<the token you were given>
+pnpm dev
+```
+
+The proxy allows `sonnet-5`, `sonnet-4.5` and `haiku-4.5`, caps output at 4096
+tokens and bodies at 32 KB, and permits 10 requests per 60 seconds with **one
+request in flight at a time** — so don't run two conversations at once.
+
+**Straight to Bedrock.** Used whenever `AIET_TOKEN` is unset. The model is
+Claude Sonnet 4.5 via `ChatBedrockConverse`, and credentials come from the AWS
+SDK default provider chain (`AWS_PROFILE`, SSO, env vars, instance role) — never
+from `.env`. You need Bedrock model access for the inference profile in
+`AGENT_MODEL`.
+
+### For the interviewer: minting a candidate token
+
+Not a candidate step. This calls a token generator Lambda in the inseng account,
+so it only works from **an assumed role that is allowed to invoke it**. Assume
+first, every time; the session lasts an hour, same as the token. The three ways
+it fails are worth telling apart:
+
+| Error | Meaning |
+| --- | --- |
+| `Unable to locate credentials` | You never assumed anything |
+| `ExpiredToken` | You did, but the hour lapsed — assume again |
+| `AccessDeniedException` | Wrong role; it can't invoke the generator |
+
+```sh
+assume inseng-power-user -r us-west-2
+
+t=$(mktemp) && aws lambda invoke --region us-west-2 \
+  --function-name rzana-ai-engineer-test-jwt-token-generator \
+  --cli-binary-format raw-in-base64-out --payload '{"duration": 3600}' "$t" >/dev/null \
+  && jq -r 'sub(".*token=";"")' "$t"; rm -f "$t"
+```
+
+Hand the printed token to the candidate along with `AIET_PROXY_URL`. Mint one per
+candidate — the rate-limit bucket is per token.
+
+Two quirks worth knowing. `duration` must be 900–3600 seconds; outside that the
+generator returns `{"error": …}` rather than a token, which is why you should
+eyeball the output instead of piping it straight into a variable. And it answers
+with a URL aimed at a decommissioned load balancer, so only the part after
+`token=` still means anything — hence the `jq`.
 
 ## Layout
 
@@ -82,6 +128,7 @@ Copy `.env.example` to `.env` to override the model or region.
 src/coursePages.ts  one course and its three hard-coded pages, the "backend"
 src/tools.ts        the three tool definitions
 src/agent.ts        model, system prompt, and the StateGraph
+src/proxyModel.ts   redirects ChatBedrockConverse onto the interview proxy
 src/cli.ts          readline REPL that keeps the history between turns
 ```
 
