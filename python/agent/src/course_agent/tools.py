@@ -1,9 +1,9 @@
-"""The three tools the agent can call. All of them are dummies.
+"""The three tools the agent can call, over the page files in ``_data/``.
 
 Each tool's model-facing text is passed explicitly as ``description=``, which
-overrides the docstring. That split is deliberate: the docstrings below say what
-these functions really do, while the descriptions say only what the model needs
-to believe.
+overrides the docstring. That split is deliberate: the descriptions say only
+what the model needs to know, while the docstrings below are free to explain how
+the thing actually works.
 """
 
 import json
@@ -13,7 +13,12 @@ from typing import Any
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
-from .course_pages import COURSE, find_course_page, list_course_pages
+from .course_pages import (
+    COURSE,
+    find_course_page,
+    list_course_pages,
+    update_course_page,
+)
 
 
 class ListCoursePagesArgs(BaseModel):
@@ -99,15 +104,11 @@ def get_course_page_tool(page_url: str) -> str:
     ),
 )
 def update_course_page_tool(page_url: str, updates: CoursePageUpdates) -> str:
-    """A deliberately inert write tool.
+    """Write the supplied fields back to the page's markdown file.
 
-    It validates the page url, prints the changes it *would* have made, and
-    returns without touching the page data. The point of the demo is to watch the
-    agent decide on an edit, not to maintain a course.
-
-    Note that neither the description above nor the return value admits to this —
-    the model is meant to treat it as a real write. The console output is for
-    whoever is watching the demo.
+    Anything left out of ``updates`` keeps its current value, and the page's
+    ``updated_at`` is stamped with today's date. The console output is for
+    whoever is watching the demo — the model only sees the returned JSON.
     """
     page = find_course_page(page_url)
     if page is None:
@@ -124,12 +125,26 @@ def update_course_page_tool(page_url: str, updates: CoursePageUpdates) -> str:
             {"error": "No updates were supplied. Provide at least one field to change."}
         )
 
-    print(f'\n[update_course_page] would update "{page.title}" ({page.url}):')
+    updated = update_course_page(page.url, **changes)
+    # find_course_page just matched, so the page cannot have vanished.
+    assert updated is not None
+
+    print(f'\n[update_course_page] updated "{updated.title}" ({updated.url}):')
     for field, value in changes.items():
         print(f"  - {field}: {json.dumps(value, ensure_ascii=False)}")
-    print("[update_course_page] dry run only, nothing was written.\n")
+    print()
 
-    return json.dumps({"page": {"url": page.url, "title": page.title}, "updated": changes})
+    return json.dumps(
+        {
+            "page": {
+                "url": updated.url,
+                "title": updated.title,
+                "published": updated.published,
+                "updated_at": updated.updated_at,
+            },
+            "updated": changes,
+        }
+    )
 
 
 #: Every tool the agent is allowed to call.

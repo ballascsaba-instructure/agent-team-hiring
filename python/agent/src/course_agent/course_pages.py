@@ -1,11 +1,36 @@
-"""In-memory stand-in for a course pages API.
+"""File-backed storage for one course's pages.
 
-The agent is a demo, so this module is the whole "backend": one course with
-three fixed pages that never change, even when the update tool is called.
+The agent is a demo, so this module is the whole "backend": a single course
+whose pages live as markdown files in a git ignored ``_data/`` directory. Each
+file holds a small frontmatter block for the metadata and the page body below
+it:
+
+    ---
+    title: Syllabus
+    published: true
+    updated_at: 2026-07-14
+    ---
+
+    # Syllabus
+    ...
+
+The file name is the page url, so ``_data/syllabus.md`` is the page
+``syllabus``. There is no index and no cache — every call reads the directory,
+which is fine at three pages and keeps hand-edits to the files visible
+immediately.
+
+``_data/`` is created and seeded with the pages in
+:mod:`course_agent.seed` the first time anything touches it, so a fresh
+clone has something to talk about.
 """
 
-from dataclasses import asdict, dataclass
+import os
+from dataclasses import asdict, dataclass, replace
+from datetime import date
+from pathlib import Path
 from typing import Any
+
+from .seed import seed_examples
 
 
 @dataclass(frozen=True)
@@ -24,88 +49,107 @@ class CoursePage:
     body: str
 
 
-#: The single course these pages belong to.
+#: The single course these pages belong to. Not stored — there is only one.
 COURSE = Course(id="course-101", code="ASTR-101", name="Introduction to Astronomy")
 
-_PAGES: tuple[CoursePage, ...] = (
-    CoursePage(
-        url="syllabus",
-        title="Syllabus",
-        published=True,
-        updated_at="2026-07-14",
-        body="\n".join(
-            [
-                "# Syllabus",
-                "",
-                "A survey of the night sky, from the solar system out to the large-scale",
-                "structure of the universe. No prior physics required.",
-                "",
-                "## Assessment",
-                "",
-                "- Weekly quizzes — 30%",
-                "- Observation log — 20%",
-                "- Final project — 50%",
-                "",
-                "Office hours are Thursdays 14:00–16:00.",
-            ]
-        ),
-    ),
-    CoursePage(
-        url="observing-the-night-sky",
-        title="Observing the Night Sky",
-        published=True,
-        updated_at="2026-08-02",
-        body="\n".join(
-            [
-                "# Observing the Night Sky",
-                "",
-                "You do not need a telescope for this course. Binoculars and a dark field",
-                "will show you more than most beginners expect.",
-                "",
-                "## Before you go out",
-                "",
-                "1. Check the moon phase — a full moon washes out everything faint.",
-                "2. Give your eyes twenty minutes to adapt, and use a red torch.",
-                "3. Find north, then work from the bright stars outwards.",
-                "",
-                "## What to record",
-                "",
-                "For each session note the date, time, location, seeing conditions, and",
-                "anything you could not identify. The unidentified entries are the ones we",
-                "discuss in class.",
-            ]
-        ),
-    ),
-    CoursePage(
-        url="final-project",
-        title="Final Project Guidelines",
-        published=False,
-        updated_at="2026-08-11",
-        body="\n".join(
-            [
-                "# Final Project Guidelines",
-                "",
-                "Pick one object in the sky and follow it for six weeks.",
-                "",
-                "## Deliverables",
-                "",
-                "- An observation log with at least eight entries",
-                "- A 2000 word write-up placing your object in its astrophysical context",
-                "- One sketch or photograph you made yourself",
-                "",
-                "## Marking",
-                "",
-                "Consistency of observation matters more than the equipment you used. A",
-                "careful naked-eye log will score higher than a sporadic telescope one.",
-            ]
-        ),
-    ),
+#: Where the page files live. ``COURSE_DATA_DIR`` overrides it; the default sits
+#: next to pyproject.toml so it is the same directory whatever the cwd is.
+DATA_DIR = Path(
+    os.environ.get("COURSE_DATA_DIR") or Path(__file__).resolve().parents[2] / "_data"
 )
+
+_FENCE = "---"
+
+
+def _serialise(page: CoursePage) -> str:
+    """Render a page as frontmatter plus body. The url is not written — it is
+    the file name."""
+    published = "true" if page.published else "false"
+    return "\n".join(
+        [
+            _FENCE,
+            f"title: {page.title}",
+            f"published: {published}",
+            f"updated_at: {page.updated_at}",
+            _FENCE,
+            "",
+            page.body.strip("\n"),
+            "",
+        ]
+    )
+
+
+def _deserialise(path: Path) -> CoursePage:
+    """Read one page file.
+
+    The frontmatter parser is deliberately tiny — ``key: value`` lines, no YAML.
+    A file with no readable frontmatter still loads: it becomes an unpublished
+    page titled after its file name, rather than an error the agent cannot act
+    on.
+    """
+    text = path.read_text(encoding="utf-8")
+    meta: dict[str, str] = {}
+    body = text
+
+    if text.startswith(f"{_FENCE}\n"):
+        header, fence, rest = text[len(_FENCE) + 1 :].partition(f"\n{_FENCE}\n")
+        if fence:
+            body = rest
+            for line in header.splitlines():
+                key, sep, value = line.partition(":")
+                if sep:
+                    meta[key.strip()] = value.strip()
+
+    return CoursePage(
+        url=path.stem,
+        title=meta.get("title") or path.stem,
+        published=meta.get("published", "").lower() == "true",
+        updated_at=meta.get("updated_at", ""),
+        body=body.strip("\n"),
+    )
+
+
+def _page_path(page_url: str) -> Path:
+    """The file a page url maps to.
+
+    ``Path(...).name`` drops any directory part, so a url like ``../secrets``
+    cannot write outside ``_data/``.
+    """
+    name = Path(page_url.strip()).name
+    if not name or name.startswith("."):
+        raise ValueError(f"Not a usable page url: {page_url!r}")
+    return DATA_DIR / f"{name}.md"
+
+
+def _write(page: CoursePage) -> None:
+    _page_path(page.url).write_text(_serialise(page), encoding="utf-8")
+
+
+def ensure_data_dir() -> Path:
+    """Create ``_data/`` and seed the example pages if it is not there yet.
+
+    Idempotent, and called by every read and write below as well as at startup,
+    so no caller has to remember to set the storage up first.
+    """
+    if DATA_DIR.is_dir():
+        return DATA_DIR
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    seed_examples(DATA_DIR)
+    return DATA_DIR
+
+
+def _load_all() -> list[CoursePage]:
+    """Every page on disk, ordered by url so listings are stable."""
+    ensure_data_dir()
+    return [_deserialise(path) for path in sorted(DATA_DIR.glob("*.md"))]
 
 
 def list_course_pages() -> list[dict[str, Any]]:
     """Every page in the course, without the body."""
-    return [{k: v for k, v in asdict(page).items() if k != "body"} for page in _PAGES]
+    return [
+        {k: v for k, v in asdict(page).items() if k != "body"} for page in _load_all()
+    ]
 
 
 def find_course_page(page_url: str) -> CoursePage | None:
@@ -114,7 +158,36 @@ def find_course_page(page_url: str) -> CoursePage | None:
     Accepts the page url or its title, case-insensitively.
     """
     needle = page_url.strip().lower()
-    for page in _PAGES:
+    for page in _load_all():
         if page.url.lower() == needle or page.title.lower() == needle:
             return page
     return None
+
+
+def update_course_page(
+    page_url: str,
+    *,
+    title: str | None = None,
+    body: str | None = None,
+    published: bool | None = None,
+) -> CoursePage | None:
+    """Write changed fields back to the page's file and return the new page.
+
+    Returns None if no page matches. Fields left as None keep their current
+    value, and ``updated_at`` is stamped with today's date on every write. The
+    url never changes, even when the title does — it is the file name, and
+    renaming files would break links the agent may already have handed out.
+    """
+    page = find_course_page(page_url)
+    if page is None:
+        return None
+
+    updated = replace(
+        page,
+        title=page.title if title is None else title,
+        body=page.body if body is None else body,
+        published=page.published if published is None else published,
+        updated_at=date.today().isoformat(),
+    )
+    _write(updated)
+    return updated

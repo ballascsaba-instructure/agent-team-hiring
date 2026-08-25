@@ -1,8 +1,8 @@
 # course-agent
 
 A deliberately minimal LangChain / LangGraph agent: one model, one tool loop,
-three dummy course page tools. It exists to show the shape of a LangGraph
-agent, not to do anything useful.
+three course page tools over a directory of markdown files. It exists to show
+the shape of a LangGraph agent, not to do anything useful.
 
 ## The graph
 
@@ -23,21 +23,47 @@ State is just the message list (`new StateSchema({ messages: MessagesValue })`);
 
 ## The tools
 
-All three are dummies in `src/tools.ts`, backed by one hard-coded course and
-three hard-coded pages in `src/coursePages.ts`.
+The three tools in `src/tools.ts` sit on top of the file storage in
+`src/coursePages.ts` — one implicit course, and one markdown file per page.
 
 | Tool | Behaviour |
 | --- | --- |
-| `list_course_pages` | Returns the three pages (url, title, published, updatedAt). Takes an optional `publishedOnly` filter. |
+| `list_course_pages` | Returns every page (url, title, published, updatedAt), ordered by url. Takes an optional `publishedOnly` filter. |
 | `get_course_page` | Returns one page's full body. Accepts a url (`final-project`) or a title (`Syllabus`). |
-| `update_course_page` | **Dry run.** Prints the changes it would make to the console and returns a success-shaped result. Nothing is ever written. |
+| `update_course_page` | Writes the supplied fields back to the page's file. Omitted fields keep their current value; `updatedAt` is stamped with today's date. |
 
-Note that `update_course_page` does not advertise itself as a dry run — neither
-its description nor its return value mentions it, so the model treats it as a
-real write. The console output is for whoever is watching the demo.
+Each tool's model-facing text is passed as `description`, so the comments in the
+source are free to explain how the thing actually works.
 
 There is no course-discovery tool, so all three operate on a single implicit
 course (`COURSE` in `src/coursePages.ts`).
+
+## The storage
+
+Pages live as markdown files in `_data/`, one file per page, named after the
+page url. `_data/` is git ignored; it is created and seeded with the three
+example pages from `src/seed.ts` the first time anything reads or writes
+a page, so a fresh clone has something to talk about. Delete the directory to
+get the examples back.
+
+```
+---
+title: Syllabus
+published: true
+updated_at: 2026-07-14
+---
+
+# Syllabus
+...
+```
+
+The frontmatter parser is a few lines of `key: value` splitting rather than
+YAML — enough for these three fields. Every call re-reads the directory, so
+files you edit by hand show up on the agent's next turn. A page's url is its
+file name and never changes, even when its title does.
+
+`_data/` sits next to `package.json` regardless of the working directory; set
+`COURSE_DATA_DIR` to put it somewhere else.
 
 ## Running it
 
@@ -62,9 +88,8 @@ You: publish it
 Thinking...
 Thinking...
 
-[update_course_page] would update "Final Project Guidelines" (final-project):
+[update_course_page] updated "Final Project Guidelines" (final-project):
   - published: true
-[update_course_page] dry run only, nothing was written.
 ```
 
 ### Reaching a model
@@ -123,7 +148,8 @@ Your interviewer mints the proxy token — see the repository
 ## Layout
 
 ```
-src/coursePages.ts  one course and its three hard-coded pages, the "backend"
+src/coursePages.ts  markdown file storage under _data/, the "backend"
+src/seed.ts         the pages a fresh _data/ is seeded with
 src/tools.ts        the three tool definitions
 src/agent.ts        system prompt and the StateGraph
 src/model.ts        picks between the proxy, Gemini and Bedrock
