@@ -1,18 +1,4 @@
-"""Route the agent through the ai-engineer-test Bedrock proxy.
-
-A candidate then needs no AWS account and no credentials — just the proxy URL
-and a short-lived JWT.
-
-boto3 cannot reach the proxy as-is: it signs with SigV4 and POSTs to
-``bedrock-runtime.<region>.amazonaws.com/model/<modelId>/converse``, whereas the
-proxy wants a bearer token, a flat URL, and ``model`` inside the body. So we turn
-signing off entirely and rewrite the request on its way out with botocore's
-``before-send`` hook. Everything after that is real botocore, which means
-``ChatBedrockConverse`` cannot tell the difference.
-
-Adapted from ``test/try_proxy.py`` in instructure/advance-development, so the two
-clients stay recognisably the same solution.
-"""
+"""Routes the agent through the ai-engineer-test Bedrock proxy, so a candidate needs no AWS account or credentials."""
 
 import json
 import os

@@ -1,8 +1,4 @@
-"""Picks where the agent's model comes from.
-
-Three ways in, one interface out — the graph in ``agent.py`` cannot tell which
-one it got.
-"""
+"""Picks the agent's model: proxy, Bedrock, or Gemini, whichever is configured."""
 
 import os
 from typing import Literal

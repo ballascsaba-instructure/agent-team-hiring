@@ -1,11 +1,4 @@
-"""The pages a fresh checkout starts with.
-
-Kept out of :mod:`course_agent.course_pages` so that module is only storage.
-The examples are written out as the files they become — frontmatter block, then
-body — rather than as :class:`~course_agent.course_pages.CoursePage` objects, so
-this module needs nothing from the storage code and doubles as a worked example
-of the on-disk format.
-"""
+"""The example pages a fresh checkout seeds ``_data/`` with."""
 
 from pathlib import Path
 

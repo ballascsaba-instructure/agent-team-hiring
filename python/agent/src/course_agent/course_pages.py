@@ -1,28 +1,4 @@
-"""File-backed storage for one course's pages.
-
-The agent is a demo, so this module is the whole "backend": a single course
-whose pages live as markdown files in a git ignored ``_data/`` directory. Each
-file holds a small frontmatter block for the metadata and the page body below
-it:
-
-    ---
-    title: Syllabus
-    published: true
-    updated_at: 2026-07-14
-    ---
-
-    # Syllabus
-    ...
-
-The file name is the page url, so ``_data/syllabus.md`` is the page
-``syllabus``. There is no index and no cache — every call reads the directory,
-which is fine at three pages and keeps hand-edits to the files visible
-immediately.
-
-``_data/`` is created and seeded with the pages in
-:mod:`course_agent.seed` the first time anything touches it, so a fresh
-clone has something to talk about.
-"""
+"""File-backed storage for one course's pages, saved as markdown files with frontmatter under ``_data/``."""
 
 import os
 from dataclasses import asdict, dataclass, replace

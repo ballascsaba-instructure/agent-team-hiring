@@ -1,22 +1,10 @@
+/** Runs the agent against the ai-engineer-test Bedrock proxy, so a candidate needs no AWS account or credentials. */
 import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { ChatBedrockConverse } from '@langchain/aws';
 import { HttpResponse } from '@smithy/protocol-http';
 import type { HttpRequest } from '@smithy/protocol-http';
 import { Readable } from 'node:stream';
 import process from 'node:process';
-
-/**
- * Runs the agent against the ai-engineer-test Bedrock proxy instead of Bedrock
- * itself, so an interview candidate needs no AWS account and no credentials —
- * just a URL and a short-lived JWT.
- *
- * The proxy speaks a *nearly* Converse-shaped protocol: a single `POST /` with
- * the model in the body and a bearer token, rather than SigV4 against
- * `/model/{modelId}/converse`. So rather than reimplement LangChain's
- * message-to-Converse translation, we let the SDK build a real Converse request
- * and rewrite it at the HTTP layer on the way out. That is the same trick the
- * Python client plays with botocore's `before-send` hook.
- */
 
 /** The only body fields the proxy accepts — anything else is a 400. */
 const ALLOWED_FIELDS = ['messages', 'system', 'inferenceConfig', 'toolConfig', 'additionalModelRequestFields'];

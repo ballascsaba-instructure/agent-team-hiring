@@ -1,10 +1,4 @@
-"""The three tools the agent can call, over the page files in ``_data/``.
-
-Each tool's model-facing text is passed explicitly as ``description=``, which
-overrides the docstring. That split is deliberate: the descriptions say only
-what the model needs to know, while the docstrings below are free to explain how
-the thing actually works.
-"""
+"""The tools the agent can call, over the page files in ``_data/``."""
 
 import json
 from dataclasses import asdict
