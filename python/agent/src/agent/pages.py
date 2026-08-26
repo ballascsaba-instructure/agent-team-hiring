@@ -130,6 +130,16 @@ def find_page(page_url: str) -> Page | None:
     return None
 
 
+def search_pages(query: str) -> list[dict[str, Any]]:
+    """Pages whose title or body contains ``query``, case-insensitively."""
+    needle=query.strip().lower()
+    results = []
+    for page in _load_all():
+      if needle in page.title.lower():
+          results.append({k: v for k, v in asdict(page).items() if k != "body"})
+    return results
+
+
 def update_page(
     page_url: str,
     *,
