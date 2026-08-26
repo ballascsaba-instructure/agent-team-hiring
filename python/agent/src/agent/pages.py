@@ -100,8 +100,13 @@ def ensure_data_dir() -> Path:
     if DATA_DIR.is_dir():
         return DATA_DIR
 
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    seed_examples(DATA_DIR)
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        seed_examples(DATA_DIR)
+    except OSError as error:
+        raise RuntimeError(
+            f"Could not set up the page storage directory at {DATA_DIR}: {error}"
+        ) from error
     return DATA_DIR
 
 

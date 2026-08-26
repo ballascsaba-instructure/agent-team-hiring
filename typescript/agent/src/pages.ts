@@ -121,8 +121,15 @@ export function ensureDataDir(): string {
     return DATA_DIR;
   }
 
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  seedExamples(DATA_DIR);
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    seedExamples(DATA_DIR);
+  } catch (error) {
+    throw new Error(
+      `Could not set up the page storage directory at ${DATA_DIR}: ${error instanceof Error ? error.message : error}`,
+      { cause: error },
+    );
+  }
   return DATA_DIR;
 }
 
