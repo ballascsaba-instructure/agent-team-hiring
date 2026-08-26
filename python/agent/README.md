@@ -1,7 +1,7 @@
-# course-agent (Python)
+# agent (Python)
 
-A deliberately minimal LangChain / LangGraph agent: one model, one tool loop,
-three course page tools over a directory of markdown files.
+A deliberately minimal LangChain/LangGraph agent that retrieves and updates simple
+markdown Wiki pages in an imaginary educational course.
 
 ## The graph
 
@@ -9,7 +9,7 @@ three course page tools over a directory of markdown files.
 __start__ -> agent -> (tool_calls?) -> tools -> agent -> ... -> __end__
 ```
 
-`src/course_agent/agent.py` builds this by hand with `StateGraph` rather than
+`src/agent/agent.py` builds this by hand with `StateGraph` rather than
 using the prebuilt `create_react_agent`, so every edge is visible:
 
 - **agent** calls the model with the system prompt plus the running history.
@@ -21,20 +21,17 @@ State is `MessagesState`, whose `add_messages` reducer appends each node's outpu
 
 ## The tools
 
-The three tools in `src/course_agent/tools.py` sit on top of the file storage in
-`course_pages.py` — one implicit course, and one markdown file per page.
+The three tools in `src/agent/tools.py` sit on top of the file storage in
+`pages.py` — one markdown file per page.
 
 | Tool | Behaviour |
 | --- | --- |
-| `list_course_pages` | Returns every page (url, title, published, updated_at), ordered by url. Takes an optional `published_only` filter. |
-| `get_course_page` | Returns one page's full body. Accepts a url (`final-project`) or a title (`Syllabus`). |
-| `update_course_page` | Writes the supplied fields back to the page's file. Omitted fields keep their current value; `updated_at` is stamped with today's date. |
+| `list_pages` | Returns every page (url, title, published, updated_at), ordered by url. Takes an optional `published_only` filter. |
+| `get_page` | Returns one page's full body. Accepts a url (`final-project`) or a title (`Syllabus`). |
+| `update_page` | Writes the supplied fields back to the page's file. Omitted fields keep their current value; `updated_at` is stamped with today's date. |
 
 Each tool's model-facing text is passed as `description=`, which overrides the
 docstring, so the docstrings are free to explain how the thing actually works.
-
-There is no course-discovery tool, so all three operate on a single implicit
-course (`COURSE` in `course_pages.py`).
 
 ## The storage
 
@@ -61,7 +58,7 @@ files you edit by hand show up on the agent's next turn. A page's url is its
 file name and never changes, even when its title does.
 
 `_data/` sits next to `pyproject.toml` regardless of the working directory; set
-`COURSE_DATA_DIR` to put it somewhere else.
+`PAGE_DATA_DIR` to put it somewhere else.
 
 ## Running it
 
@@ -69,13 +66,13 @@ Requires Python >= 3.12 and [uv](https://docs.astral.sh/uv/).
 
 ```sh
 uv sync
-uv run course-agent
+uv run agent
 ```
 
 That starts a line-based REPL. Type a message, press enter, Ctrl-D or Ctrl-C to quit.
 
 ```
-You: what pages are in the course?
+You: what pages are there?
 Thinking...
 
 Agent: Three: Syllabus, Observing the Night Sky, and Final Project Guidelines.
@@ -85,7 +82,7 @@ You: publish it
 Thinking...
 Thinking...
 
-[update_course_page] updated "Final Project Guidelines" (final-project):
+[update_page] updated "Final Project Guidelines" (final-project):
   - published: true
 ```
 
@@ -112,7 +109,7 @@ interviewer supplies the token; it lasts an hour.
 
 ```sh
 export AIET_TOKEN=<the token you were given>
-uv run course-agent
+uv run agent
 ```
 
 `proxy_model.py` turns SigV4 signing off and rewrites each request onto the proxy
@@ -129,7 +126,7 @@ models have a free tier.
 
 ```sh
 export GOOGLE_API_KEY=<your key>
-uv run course-agent
+uv run agent
 ```
 
 The free tier is rate limited per minute and per day, so a long session can
@@ -147,13 +144,13 @@ Your interviewer mints the proxy token — see the repository
 ## Layout
 
 ```
-src/course_agent/course_pages.py  markdown file storage under _data/, the "backend"
-src/course_agent/seed.py          the pages a fresh _data/ is seeded with
-src/course_agent/tools.py         the three tool definitions
-src/course_agent/agent.py         system prompt and the StateGraph
-src/course_agent/model.py         picks between the proxy, Gemini and Bedrock
-src/course_agent/proxy_model.py   redirects boto3 onto the interview proxy
-src/course_agent/cli.py           REPL that keeps the history between turns
+src/agent/pages.py       markdown file storage under _data/, the "backend"
+src/agent/seed.py        the pages a fresh _data/ is seeded with
+src/agent/tools.py       the three tool definitions
+src/agent/agent.py       system prompt and the StateGraph
+src/agent/model.py       picks between the proxy, Gemini and Bedrock
+src/agent/proxy_model.py redirects boto3 onto the interview proxy
+src/agent/cli.py         REPL that keeps the history between turns
 ```
 
 `uv run mypy` typechecks in strict mode.

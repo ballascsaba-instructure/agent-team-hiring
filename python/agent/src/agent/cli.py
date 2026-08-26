@@ -11,7 +11,7 @@ def run() -> None:
     load_dotenv()
 
     from .agent import build_agent
-    from .course_pages import ensure_data_dir
+    from .pages import ensure_data_dir
 
     # Creates _data/ and seeds the example pages on a fresh checkout.
     print(f"Pages: {ensure_data_dir()}")

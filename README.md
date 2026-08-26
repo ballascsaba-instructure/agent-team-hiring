@@ -6,7 +6,7 @@ language you prefer. The two ports of a project mirror each other closely.
 
 | Project | What it is |
 | --- | --- |
-| [`typescript/agent`](typescript/agent) · [`python/agent`](python/agent) | A minimal LangChain/LangGraph agent: one model, one tool loop, and three dummy course-page tools. |
+| [`typescript/agent`](typescript/agent) · [`python/agent`](python/agent) | A minimal LangChain/LangGraph agent: one model, one tool loop, and three dummy page tools. |
 | [`typescript/eval-harness`](typescript/eval-harness) · [`python/eval-harness`](python/eval-harness) | A small LLM-judge eval harness that scores chat scenarios and reports pass rates. |
 
 Each package stands alone — its own `package.json` or `pyproject.toml`, its own
