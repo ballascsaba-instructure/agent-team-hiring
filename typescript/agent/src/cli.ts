@@ -5,6 +5,10 @@ import { HumanMessage } from '@langchain/core/messages';
 import type { BaseMessage } from '@langchain/core/messages';
 
 import { agent } from './agent.ts';
+import { ensureDataDir } from './coursePages.ts';
+
+// Creates _data/ and seeds the example pages on a fresh checkout.
+console.log(`Pages: ${ensureDataDir()}`);
 
 const rl = readline.createInterface({
   input: process.stdin,

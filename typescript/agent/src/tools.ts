@@ -1,7 +1,8 @@
+/** The tools the agent can call, over the page files in `_data/`. */
 import { tool } from '@langchain/core/tools';
 import * as z from 'zod';
 
-import { COURSE, findCoursePage, listCoursePages } from './coursePages.ts';
+import { COURSE, findCoursePage, listCoursePages, updateCoursePage } from './coursePages.ts';
 
 /**
  * Lists the pages in the course.
@@ -53,13 +54,11 @@ export const getCoursePageTool = tool(
 );
 
 /**
- * A deliberately inert write tool. It validates the page url, prints the
- * changes it *would* have made, and returns without touching the page data.
- * The point of the demo is to watch the agent decide on an edit, not to
- * maintain a course.
+ * Writes the supplied fields back to the page's markdown file.
  *
- * Note that neither the description below nor the return value admits to this
- * — the model is meant to treat it as a real write.
+ * Anything left out of `updates` keeps its current value, and the page's
+ * `updatedAt` is stamped with today's date. The console output is for whoever
+ * is watching the demo — the model only sees the returned JSON.
  */
 export const updateCoursePageTool = tool(
   ({ pageUrl, updates }) => {
@@ -79,14 +78,22 @@ export const updateCoursePageTool = tool(
       });
     }
 
-    console.log(`\n[update_course_page] would update "${page.title}" (${page.url}):`);
+    // findCoursePage just matched, so the page cannot have vanished.
+    const updated = updateCoursePage(page.url, updates)!;
+
+    console.log(`\n[update_course_page] updated "${updated.title}" (${updated.url}):`);
     for (const [field, value] of changes) {
       console.log(`  - ${field}: ${JSON.stringify(value)}`);
     }
-    console.log('[update_course_page] dry run only, nothing was written.\n');
+    console.log();
 
     return JSON.stringify({
-      page: { url: page.url, title: page.title },
+      page: {
+        url: updated.url,
+        title: updated.title,
+        published: updated.published,
+        updatedAt: updated.updatedAt,
+      },
       updated: Object.fromEntries(changes),
     });
   },

@@ -1,8 +1,7 @@
 # course-agent (Python)
 
 A deliberately minimal LangChain / LangGraph agent: one model, one tool loop,
-three dummy course page tools. A port of `typescript/agent`, mirroring it
-module for module.
+three course page tools over a directory of markdown files.
 
 ## The graph
 
@@ -22,22 +21,47 @@ State is `MessagesState`, whose `add_messages` reducer appends each node's outpu
 
 ## The tools
 
-All three are dummies in `src/course_agent/tools.py`, backed by one hard-coded
-course and three hard-coded pages in `course_pages.py`.
+The three tools in `src/course_agent/tools.py` sit on top of the file storage in
+`course_pages.py` — one implicit course, and one markdown file per page.
 
 | Tool | Behaviour |
 | --- | --- |
-| `list_course_pages` | Returns the three pages (url, title, published, updated_at). Takes an optional `published_only` filter. |
+| `list_course_pages` | Returns every page (url, title, published, updated_at), ordered by url. Takes an optional `published_only` filter. |
 | `get_course_page` | Returns one page's full body. Accepts a url (`final-project`) or a title (`Syllabus`). |
-| `update_course_page` | **Dry run.** Prints the changes it would make and returns a success-shaped result. Nothing is ever written. |
+| `update_course_page` | Writes the supplied fields back to the page's file. Omitted fields keep their current value; `updated_at` is stamped with today's date. |
 
-`update_course_page` does not advertise itself as a dry run — the model treats it
-as a real write. Each tool's model-facing text is passed as `description=`, which
-overrides the docstring, so the docstrings can stay honest about what the
-functions really do.
+Each tool's model-facing text is passed as `description=`, which overrides the
+docstring, so the docstrings are free to explain how the thing actually works.
 
 There is no course-discovery tool, so all three operate on a single implicit
 course (`COURSE` in `course_pages.py`).
+
+## The storage
+
+Pages live as markdown files in `_data/`, one file per page, named after the
+page url. `_data/` is git ignored; it is created and seeded with the three
+example pages from `seed.py` the first time anything reads or writes a
+page, so a fresh clone has something to talk about. Delete the directory to get
+the examples back.
+
+```
+---
+title: Syllabus
+published: true
+updated_at: 2026-07-14
+---
+
+# Syllabus
+...
+```
+
+The frontmatter parser is a few lines of `key: value` splitting rather than
+YAML — enough for these three fields. Every call re-reads the directory, so
+files you edit by hand show up on the agent's next turn. A page's url is its
+file name and never changes, even when its title does.
+
+`_data/` sits next to `pyproject.toml` regardless of the working directory; set
+`COURSE_DATA_DIR` to put it somewhere else.
 
 ## Running it
 
@@ -61,9 +85,8 @@ You: publish it
 Thinking...
 Thinking...
 
-[update_course_page] would update "Final Project Guidelines" (final-project):
+[update_course_page] updated "Final Project Guidelines" (final-project):
   - published: true
-[update_course_page] dry run only, nothing was written.
 ```
 
 ### Reaching a model
@@ -124,7 +147,8 @@ Your interviewer mints the proxy token — see the repository
 ## Layout
 
 ```
-src/course_agent/course_pages.py  one course and its three pages, the "backend"
+src/course_agent/course_pages.py  markdown file storage under _data/, the "backend"
+src/course_agent/seed.py          the pages a fresh _data/ is seeded with
 src/course_agent/tools.py         the three tool definitions
 src/course_agent/agent.py         system prompt and the StateGraph
 src/course_agent/model.py         picks between the proxy, Gemini and Bedrock

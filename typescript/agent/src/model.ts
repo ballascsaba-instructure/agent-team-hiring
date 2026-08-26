@@ -1,14 +1,10 @@
+/** Picks the agent's model: proxy, Bedrock, or Gemini, whichever is configured. */
 import { ChatBedrockConverse } from '@langchain/aws';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import process from 'node:process';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 import { createProxyModel, proxyConfigured } from './proxyModel.ts';
-
-/**
- * Picks where the agent's model comes from. Three ways in, one interface out —
- * the graph in `agent.ts` cannot tell which one it got.
- */
 
 /** Cross-region inference profile for Claude Sonnet 4.5 on Bedrock. */
 const DEFAULT_BEDROCK_MODEL = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0';
