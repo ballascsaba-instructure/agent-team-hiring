@@ -14,7 +14,11 @@ def run() -> None:
     from .pages import ensure_data_dir
 
     # Creates _data/ and seeds the example pages on a fresh checkout.
-    print(f"Pages: {ensure_data_dir()}")
+    try:
+        print(f"Pages: {ensure_data_dir()}")
+    except RuntimeError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        sys.exit(1)
 
     agent = build_agent()
     history: list[BaseMessage] = []

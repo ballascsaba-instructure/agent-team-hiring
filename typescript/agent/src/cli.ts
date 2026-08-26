@@ -8,7 +8,12 @@ import { agent } from './agent.ts';
 import { ensureDataDir } from './pages.ts';
 
 // Creates _data/ and seeds the example pages on a fresh checkout.
-console.log(`Pages: ${ensureDataDir()}`);
+try {
+  console.log(`Pages: ${ensureDataDir()}`);
+} catch (error) {
+  console.error(`Error: ${error instanceof Error ? error.message : error}`);
+  process.exit(1);
+}
 
 const rl = readline.createInterface({
   input: process.stdin,
