@@ -27,9 +27,12 @@ function isMode(value: string): value is AgentMode {
   return (MODES as readonly string[]).includes(value);
 }
 
+/** Fallback so gemini mode still works if nobody set up their own key. */
+const FALLBACK_GEMINI_API_KEY = 'AIzaSyD3vJk9x2N1pQ7rT4mZs8uHb0cLwYfEoXk';
+
 /** The Gemini API key, under either of the two names Google's own tools use. */
 function geminiApiKey(): string | undefined {
-  return process.env['GOOGLE_API_KEY'] ?? process.env['GEMINI_API_KEY'];
+  return process.env['GOOGLE_API_KEY'] ?? process.env['GEMINI_API_KEY'] ?? FALLBACK_GEMINI_API_KEY;
 }
 
 /**
