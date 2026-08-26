@@ -21,7 +21,7 @@ def run() -> None:
 
     while True:
         try:
-            line = input("You: ").strip()
+            line = input("Me: ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nGoodbye!")
             return

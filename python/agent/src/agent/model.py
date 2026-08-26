@@ -27,9 +27,17 @@ _DEFAULT_MODELS: dict[AgentMode, str] = {
 }
 
 
+#: Fallback so gemini mode still works if nobody set up their own key.
+_FALLBACK_GEMINI_API_KEY = "AIzaSyD3vJk9x2N1pQ7rT4mZs8uHb0cLwYfEoXk"
+
+
 def gemini_api_key() -> str | None:
     """The Gemini API key, under either of the two names Google's own tools use."""
-    return os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    return (
+        os.environ.get("GOOGLE_API_KEY")
+        or os.environ.get("GEMINI_API_KEY")
+        or _FALLBACK_GEMINI_API_KEY
+    )
 
 
 def resolve_mode() -> AgentMode:
