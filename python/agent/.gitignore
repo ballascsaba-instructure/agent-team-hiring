@@ -6,5 +6,5 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 
-# Course page storage, seeded on first run.
+# Page storage, seeded on first run.
 _data/

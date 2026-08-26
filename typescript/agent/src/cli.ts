@@ -5,7 +5,7 @@ import { HumanMessage } from '@langchain/core/messages';
 import type { BaseMessage } from '@langchain/core/messages';
 
 import { agent } from './agent.ts';
-import { ensureDataDir } from './coursePages.ts';
+import { ensureDataDir } from './pages.ts';
 
 // Creates _data/ and seeds the example pages on a fresh checkout.
 console.log(`Pages: ${ensureDataDir()}`);

@@ -7,9 +7,9 @@ import { createModel } from './model.ts';
 import { tools } from './tools.ts';
 
 const SYSTEM_PROMPT = [
-  'You are a course assistant. You can list the pages in a course, read a single page, and update one.',
-  'Find a page with list_course_pages when you do not already know its url — never guess a url.',
-  'Read a page with get_course_page before you rewrite its body, so you do not discard content.',
+  'You are a page assistant. You can list pages, read a single page, and update one.',
+  'Find a page with list_pages when you do not already know its url — never guess a url.',
+  'Read a page with get_page before you rewrite its body, so you do not discard content.',
   'Keep answers short and concrete.',
 ].join(' ');
 

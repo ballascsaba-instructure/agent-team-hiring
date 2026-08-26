@@ -1,11 +1,11 @@
-/** File-backed storage for one course's pages, saved as markdown files with frontmatter under `_data/`. */
+/** File-backed storage for pages, saved as markdown files with frontmatter under `_data/`. */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import process from 'node:process';
 
 import { seedExamples } from './seed.ts';
 
-export interface CoursePage {
+export interface Page {
   url: string;
   title: string;
   published: boolean;
@@ -14,20 +14,17 @@ export interface CoursePage {
 }
 
 /** A page as it appears in a listing — no body. */
-export type CoursePageSummary = Omit<CoursePage, 'body'>;
+export type PageSummary = Omit<Page, 'body'>;
 
-/** The fields `updateCoursePage` will write. Omitted fields keep their value. */
-export type CoursePageUpdates = Partial<Pick<CoursePage, 'title' | 'body' | 'published'>>;
-
-/** The single course these pages belong to. Not stored — there is only one. */
-export const COURSE = { id: 'course-101', code: 'ASTR-101', name: 'Introduction to Astronomy' };
+/** The fields `updatePage` will write. Omitted fields keep their value. */
+export type PageUpdates = Partial<Pick<Page, 'title' | 'body' | 'published'>>;
 
 /**
- * Where the page files live. `COURSE_DATA_DIR` overrides it; the default sits
+ * Where the page files live. `PAGE_DATA_DIR` overrides it; the default sits
  * next to package.json so it is the same directory whatever the cwd is.
  */
 export const DATA_DIR =
-  process.env.COURSE_DATA_DIR || path.resolve(import.meta.dirname, '..', '_data');
+  process.env.PAGE_DATA_DIR || path.resolve(import.meta.dirname, '..', '_data');
 
 const FENCE = '---';
 
@@ -46,7 +43,7 @@ const trimNewlines = (text: string): string => text.replace(/^\n+|\n+$/g, '');
  * file name. The `updated_at` key is snake_case so the files stay readable by
  * the Python port, which writes the same format.
  */
-function serialise(page: CoursePage): string {
+function serialise(page: Page): string {
   return [
     FENCE,
     `title: ${page.title}`,
@@ -66,7 +63,7 @@ function serialise(page: CoursePage): string {
  * file with no readable frontmatter still loads: it becomes an unpublished page
  * titled after its file name, rather than an error the agent cannot act on.
  */
-function deserialise(filePath: string): CoursePage {
+function deserialise(filePath: string): Page {
   const text = fs.readFileSync(filePath, 'utf8');
   const url = path.basename(filePath, '.md');
   const meta = new Map<string, string>();
@@ -109,7 +106,7 @@ function pagePath(pageUrl: string): string {
   return path.join(DATA_DIR, `${name}.md`);
 }
 
-function write(page: CoursePage): void {
+function write(page: Page): void {
   fs.writeFileSync(pagePath(page.url), serialise(page), 'utf8');
 }
 
@@ -130,7 +127,7 @@ export function ensureDataDir(): string {
 }
 
 /** Every page on disk, ordered by url so listings are stable. */
-function loadAll(): CoursePage[] {
+function loadAll(): Page[] {
   ensureDataDir();
   return fs
     .readdirSync(DATA_DIR)
@@ -139,8 +136,8 @@ function loadAll(): CoursePage[] {
     .map((name) => deserialise(path.join(DATA_DIR, name)));
 }
 
-/** Every page in the course, without the body. */
-export function listCoursePages(): CoursePageSummary[] {
+/** Every page, without the body. */
+export function listPages(): PageSummary[] {
   return loadAll().map(({ url, title, published, updatedAt }) => ({ url, title, published, updatedAt }));
 }
 
@@ -148,7 +145,7 @@ export function listCoursePages(): CoursePageSummary[] {
  * A single page with its full body, or `undefined` if nothing matches.
  * Accepts the page url or its title, case-insensitively.
  */
-export function findCoursePage(pageUrl: string): CoursePage | undefined {
+export function findPage(pageUrl: string): Page | undefined {
   const needle = pageUrl.trim().toLowerCase();
   return loadAll().find((page) => page.url.toLowerCase() === needle || page.title.toLowerCase() === needle);
 }
@@ -162,14 +159,14 @@ export function findCoursePage(pageUrl: string): CoursePage | undefined {
  * the title does — it is the file name, and renaming files would break links
  * the agent may already have handed out.
  */
-export function updateCoursePage(pageUrl: string, updates: CoursePageUpdates): CoursePage | undefined {
-  const page = findCoursePage(pageUrl);
+export function updatePage(pageUrl: string, updates: PageUpdates): Page | undefined {
+  const page = findPage(pageUrl);
 
   if (!page) {
     return undefined;
   }
 
-  const updated: CoursePage = {
+  const updated: Page = {
     ...page,
     title: updates.title ?? page.title,
     body: updates.body ?? page.body,

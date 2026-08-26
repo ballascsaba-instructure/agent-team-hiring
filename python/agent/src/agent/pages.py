@@ -1,4 +1,4 @@
-"""File-backed storage for one course's pages, saved as markdown files with frontmatter under ``_data/``."""
+"""File-backed storage for pages, saved as markdown files with frontmatter under ``_data/``."""
 
 import os
 from dataclasses import asdict, dataclass, replace
@@ -10,14 +10,7 @@ from .seed import seed_examples
 
 
 @dataclass(frozen=True)
-class Course:
-    id: str
-    code: str
-    name: str
-
-
-@dataclass(frozen=True)
-class CoursePage:
+class Page:
     url: str
     title: str
     published: bool
@@ -25,19 +18,16 @@ class CoursePage:
     body: str
 
 
-#: The single course these pages belong to. Not stored — there is only one.
-COURSE = Course(id="course-101", code="ASTR-101", name="Introduction to Astronomy")
-
-#: Where the page files live. ``COURSE_DATA_DIR`` overrides it; the default sits
+#: Where the page files live. ``PAGE_DATA_DIR`` overrides it; the default sits
 #: next to pyproject.toml so it is the same directory whatever the cwd is.
 DATA_DIR = Path(
-    os.environ.get("COURSE_DATA_DIR") or Path(__file__).resolve().parents[2] / "_data"
+    os.environ.get("PAGE_DATA_DIR") or Path(__file__).resolve().parents[2] / "_data"
 )
 
 _FENCE = "---"
 
 
-def _serialise(page: CoursePage) -> str:
+def _serialise(page: Page) -> str:
     """Render a page as frontmatter plus body. The url is not written — it is
     the file name."""
     published = "true" if page.published else "false"
@@ -55,7 +45,7 @@ def _serialise(page: CoursePage) -> str:
     )
 
 
-def _deserialise(path: Path) -> CoursePage:
+def _deserialise(path: Path) -> Page:
     """Read one page file.
 
     The frontmatter parser is deliberately tiny — ``key: value`` lines, no YAML.
@@ -76,7 +66,7 @@ def _deserialise(path: Path) -> CoursePage:
                 if sep:
                     meta[key.strip()] = value.strip()
 
-    return CoursePage(
+    return Page(
         url=path.stem,
         title=meta.get("title") or path.stem,
         published=meta.get("published", "").lower() == "true",
@@ -97,7 +87,7 @@ def _page_path(page_url: str) -> Path:
     return DATA_DIR / f"{name}.md"
 
 
-def _write(page: CoursePage) -> None:
+def _write(page: Page) -> None:
     _page_path(page.url).write_text(_serialise(page), encoding="utf-8")
 
 
@@ -115,20 +105,20 @@ def ensure_data_dir() -> Path:
     return DATA_DIR
 
 
-def _load_all() -> list[CoursePage]:
+def _load_all() -> list[Page]:
     """Every page on disk, ordered by url so listings are stable."""
     ensure_data_dir()
     return [_deserialise(path) for path in sorted(DATA_DIR.glob("*.md"))]
 
 
-def list_course_pages() -> list[dict[str, Any]]:
-    """Every page in the course, without the body."""
+def list_pages() -> list[dict[str, Any]]:
+    """Every page, without the body."""
     return [
         {k: v for k, v in asdict(page).items() if k != "body"} for page in _load_all()
     ]
 
 
-def find_course_page(page_url: str) -> CoursePage | None:
+def find_page(page_url: str) -> Page | None:
     """A single page with its full body, or None if nothing matches.
 
     Accepts the page url or its title, case-insensitively.
@@ -140,13 +130,13 @@ def find_course_page(page_url: str) -> CoursePage | None:
     return None
 
 
-def update_course_page(
+def update_page(
     page_url: str,
     *,
     title: str | None = None,
     body: str | None = None,
     published: bool | None = None,
-) -> CoursePage | None:
+) -> Page | None:
     """Write changed fields back to the page's file and return the new page.
 
     Returns None if no page matches. Fields left as None keep their current
@@ -154,7 +144,7 @@ def update_course_page(
     url never changes, even when the title does — it is the file name, and
     renaming files would break links the agent may already have handed out.
     """
-    page = find_course_page(page_url)
+    page = find_page(page_url)
     if page is None:
         return None
 

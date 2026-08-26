@@ -1,8 +1,7 @@
-# course-agent
+# agent
 
-A deliberately minimal LangChain / LangGraph agent: one model, one tool loop,
-three course page tools over a directory of markdown files. It exists to show
-the shape of a LangGraph agent, not to do anything useful.
+A deliberately minimal LangChain/LangGraph agent that retrieves and updates simple
+markdown Wiki pages in an imaginary educational course.
 
 ## The graph
 
@@ -24,19 +23,16 @@ State is just the message list (`new StateSchema({ messages: MessagesValue })`);
 ## The tools
 
 The three tools in `src/tools.ts` sit on top of the file storage in
-`src/coursePages.ts` — one implicit course, and one markdown file per page.
+`src/pages.ts` — one markdown file per page.
 
 | Tool | Behaviour |
 | --- | --- |
-| `list_course_pages` | Returns every page (url, title, published, updatedAt), ordered by url. Takes an optional `publishedOnly` filter. |
-| `get_course_page` | Returns one page's full body. Accepts a url (`final-project`) or a title (`Syllabus`). |
-| `update_course_page` | Writes the supplied fields back to the page's file. Omitted fields keep their current value; `updatedAt` is stamped with today's date. |
+| `list_pages` | Returns every page (url, title, published, updatedAt), ordered by url. Takes an optional `publishedOnly` filter. |
+| `get_page` | Returns one page's full body. Accepts a url (`final-project`) or a title (`Syllabus`). |
+| `update_page` | Writes the supplied fields back to the page's file. Omitted fields keep their current value; `updatedAt` is stamped with today's date. |
 
 Each tool's model-facing text is passed as `description`, so the comments in the
 source are free to explain how the thing actually works.
-
-There is no course-discovery tool, so all three operate on a single implicit
-course (`COURSE` in `src/coursePages.ts`).
 
 ## The storage
 
@@ -63,7 +59,7 @@ files you edit by hand show up on the agent's next turn. A page's url is its
 file name and never changes, even when its title does.
 
 `_data/` sits next to `package.json` regardless of the working directory; set
-`COURSE_DATA_DIR` to put it somewhere else.
+`PAGE_DATA_DIR` to put it somewhere else.
 
 ## Running it
 
@@ -78,7 +74,7 @@ pnpm dev
 `pnpm dev` starts a line-based REPL. Type a message, press enter, Ctrl-C to quit.
 
 ```
-You: what pages are in the course?
+You: what pages are there?
 Thinking...
 
 Agent: Three: Syllabus, Observing the Night Sky, and Final Project Guidelines.
@@ -88,7 +84,7 @@ You: publish it
 Thinking...
 Thinking...
 
-[update_course_page] updated "Final Project Guidelines" (final-project):
+[update_page] updated "Final Project Guidelines" (final-project):
   - published: true
 ```
 
@@ -148,7 +144,7 @@ Your interviewer mints the proxy token — see the repository
 ## Layout
 
 ```
-src/coursePages.ts  markdown file storage under _data/, the "backend"
+src/pages.ts        markdown file storage under _data/, the "backend"
 src/seed.ts         the pages a fresh _data/ is seeded with
 src/tools.ts        the three tool definitions
 src/agent.ts        system prompt and the StateGraph

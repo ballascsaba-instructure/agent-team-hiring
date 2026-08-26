@@ -1,8 +1,8 @@
 {
-  "name": "course-agent",
+  "name": "agent",
   "version": "0.1.0",
   "private": true,
-  "description": "A minimal LangChain/LangGraph agent with three dummy course tools.",
+  "description": "A minimal LangChain/LangGraph agent with three dummy page tools.",
   "type": "module",
   "engines": {
     "node": ">=24"
