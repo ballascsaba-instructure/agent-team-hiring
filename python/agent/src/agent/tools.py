@@ -7,7 +7,7 @@ from typing import Any
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
-from .pages import find_page, list_pages, update_page
+from .pages import find_page, list_pages, search_pages, update_page
 
 
 class ListPagesArgs(BaseModel):
@@ -15,6 +15,10 @@ class ListPagesArgs(BaseModel):
         default=None,
         description="Set to true to list only published pages. Omit to list all pages.",
     )
+
+
+class SearchPagesArgs(BaseModel):
+    query: str = Field(description="Text to search for in the page title or body.")
 
 
 class GetPageArgs(BaseModel):
@@ -85,6 +89,17 @@ def get_page_tool(page_url: str) -> str:
 
 
 @tool(
+    "search_pages",
+    args_schema=SearchPagesArgs,
+    description="Search every page's title and body for the given text and return the matches.",
+)
+def search_pages_tool(query: str) -> str:
+    """Search pages by title or body."""
+    results=search_pages(query)
+    return json.dumps({"pages": results}, indent=2, ensure_ascii=False)
+
+
+@tool(
     "update_page",
     args_schema=UpdatePageArgs,
     description=(
@@ -137,4 +152,4 @@ def update_page_tool(page_url: str, updates: PageUpdates) -> str:
 
 
 #: Every tool the agent is allowed to call.
-TOOLS: list[BaseTool] = [list_pages_tool, get_page_tool, update_page_tool]
+TOOLS: list[BaseTool] = [list_pages_tool, get_page_tool, update_page_tool, search_pages_tool]
