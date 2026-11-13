@@ -157,6 +157,18 @@ export function findPage(pageUrl: string): Page | undefined {
   return loadAll().find((page) => page.url.toLowerCase() === needle || page.title.toLowerCase() === needle);
 }
 
+/** Pages whose title or body contains `query`, case-insensitively. */
+export function searchPages(query: string): PageSummary[] {
+  const needle=query.trim().toLowerCase();
+  const results: PageSummary[] = [];
+  for (const page of loadAll()) {
+      if (page.title.toLowerCase().includes(needle)) {
+    results.push({ url: page.url, title: page.title, published: page.published, updatedAt: page.updatedAt });
+      }
+  }
+  return results;
+}
+
 /**
  * Write changed fields back to the page's file and return the new page, or
  * `undefined` if no page matches.

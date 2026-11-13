@@ -53,7 +53,7 @@ rl.on('line', async (line) => {
   if (processing) return;
 
   await chat(line.trim());
-  process.stdout.write('You: ');
+  process.stdout.write('Me: ');
 }).on('close', () => {
   console.log('\nGoodbye!');
   process.exit(0);
@@ -68,4 +68,4 @@ process.stdin.on('error', () => {
   process.exit(0);
 });
 
-process.stdout.write('You: ');
+process.stdout.write('Me: ');

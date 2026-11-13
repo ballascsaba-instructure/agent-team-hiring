@@ -2,7 +2,7 @@
 import { tool } from '@langchain/core/tools';
 import * as z from 'zod';
 
-import { findPage, listPages, updatePage } from './pages.ts';
+import { findPage, listPages, searchPages, updatePage } from './pages.ts';
 
 /**
  * Lists the pages.
@@ -49,6 +49,21 @@ export const getPageTool = tool(
       'Accepts either the page url (for example "final-project") or its title (for example "Syllabus").',
     schema: z.object({
       pageUrl: z.string().describe('The url or title of the page to fetch.'),
+    }),
+  },
+);
+
+/** Searches pages by title or body. */
+export const searchPagesTool = tool(
+  ({ query }) => {
+    const results=searchPages(query);
+    return JSON.stringify({ pages: results }, null, 2);
+  },
+  {
+    name: 'search_pages',
+    description: "Search every page's title and body for the given text and return the matches.",
+    schema: z.object({
+      query: z.string().describe('Text to search for in the page title or body.'),
     }),
   },
 );
@@ -116,4 +131,4 @@ export const updatePageTool = tool(
 );
 
 /** Every tool the agent is allowed to call. */
-export const tools = [listPagesTool, getPageTool, updatePageTool];
+export const tools = [listPagesTool, getPageTool, updatePageTool, searchPagesTool];
